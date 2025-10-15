@@ -1,6 +1,7 @@
 import express, { Request, Response } from "express";
 import multer from "multer";
 import FormData from "form-data";
+import axios from "axios";
 
 const router = express.Router();
 const upload = multer({ storage: multer.memoryStorage() });
@@ -162,31 +163,29 @@ router.post(
         formData.append("language", req.body.language);
       }
 
-      // Send to OpenAI using form-data
-      const upstream = await fetch(
+      // Send to OpenAI using axios (handles FormData properly)
+      const response = await axios.post(
         "https://api.openai.com/v1/audio/transcriptions",
+        formData,
         {
-          method: "POST",
           headers: {
             Authorization: `Bearer ${apiKey}`,
             ...formData.getHeaders(),
           },
-          body: formData as any,
+          validateStatus: () => true, // Don't throw on any status
         }
       );
 
-      if (!upstream.ok) {
-        const errorText = await upstream.text();
-        console.error("OpenAI API error:", upstream.status, errorText);
-        res.status(upstream.status).json({
+      if (response.status !== 200) {
+        console.error("OpenAI API error:", response.status, response.data);
+        res.status(response.status).json({
           message: "OpenAI transcription failed",
-          error: errorText,
+          error: response.data,
         });
         return;
       }
 
-      const data = await upstream.json();
-      res.json(data);
+      res.json(response.data);
     } catch (err: any) {
       console.error("/api/ai/transcribe error:", err);
       res.status(500).json({
