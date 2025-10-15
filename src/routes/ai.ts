@@ -138,13 +138,22 @@ router.post(
   upload.single("file"),
   async (req: Request, res: Response): Promise<void> => {
     try {
+      console.log("Transcribe request received:", {
+        hasFile: !!req.file,
+        fileSize: req.file?.size,
+        mimetype: req.file?.mimetype,
+        body: req.body,
+      });
+
       const apiKey = process.env.OPENAI_API_KEY;
       if (!apiKey) {
+        console.error("OPENAI_API_KEY not configured");
         res.status(500).json({ message: "OPENAI_API_KEY not configured" });
         return;
       }
 
       if (!req.file) {
+        console.error("No audio file provided");
         res.status(400).json({ message: "No audio file provided" });
         return;
       }
@@ -188,9 +197,15 @@ router.post(
       res.json(response.data);
     } catch (err: any) {
       console.error("/api/ai/transcribe error:", err);
+      console.error("Error details:", {
+        message: err?.message,
+        response: err?.response?.data,
+        status: err?.response?.status,
+      });
       res.status(500).json({
         message: "OpenAI proxy error",
         error: err?.message,
+        details: err?.response?.data || err?.stack,
       });
       return;
     }
