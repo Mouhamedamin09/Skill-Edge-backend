@@ -34,7 +34,9 @@ router.post(
       }
 
       if (!planId || !["pro", "pro+"].includes(planId)) {
-        res.status(400).json({ success: false, error: "Invalid plan selected" });
+        res
+          .status(400)
+          .json({ success: false, error: "Invalid plan selected" });
         return;
       }
 
@@ -130,19 +132,27 @@ router.post(
     try {
       switch (event.type) {
         case "checkout.session.completed":
-          await handleCheckoutSessionCompleted(event.data.object as Stripe.Checkout.Session);
+          await handleCheckoutSessionCompleted(
+            event.data.object as Stripe.Checkout.Session
+          );
           break;
 
         case "customer.subscription.updated":
-          await handleSubscriptionUpdated(event.data.object as Stripe.Subscription);
+          await handleSubscriptionUpdated(
+            event.data.object as Stripe.Subscription
+          );
           break;
 
         case "customer.subscription.deleted":
-          await handleSubscriptionDeleted(event.data.object as Stripe.Subscription);
+          await handleSubscriptionDeleted(
+            event.data.object as Stripe.Subscription
+          );
           break;
 
         case "invoice.payment_succeeded":
-          await handleInvoicePaymentSucceeded(event.data.object as Stripe.Invoice);
+          await handleInvoicePaymentSucceeded(
+            event.data.object as Stripe.Invoice
+          );
           break;
 
         case "invoice.payment_failed":
@@ -210,7 +220,9 @@ router.post(
 
 // =============== Webhook Handlers ===============
 
-async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) {
+async function handleCheckoutSessionCompleted(
+  session: Stripe.Checkout.Session
+) {
   const userId = session.metadata?.userId;
   const planId = session.metadata?.planId;
 
@@ -246,7 +258,9 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
 
 async function handleSubscriptionUpdated(subscription: Stripe.Subscription) {
   const customerId = subscription.customer as string;
-  const user = await User.findOne({ "subscription.stripeCustomerId": customerId });
+  const user = await User.findOne({
+    "subscription.stripeCustomerId": customerId,
+  });
 
   if (!user) {
     console.error(`User not found for customer: ${customerId}`);
@@ -256,7 +270,7 @@ async function handleSubscriptionUpdated(subscription: Stripe.Subscription) {
   // Update subscription status
   if (subscription.status === "active") {
     user.subscription.status = "active";
-    
+
     // Determine plan from price ID
     const priceId = subscription.items.data[0]?.price.id;
     if (priceId === STRIPE_PRICE_IDS.pro) {
@@ -273,7 +287,10 @@ async function handleSubscriptionUpdated(subscription: Stripe.Subscription) {
       user.subscription.endDate = new Date(periodEnd * 1000);
     }
   } else {
-    user.subscription.status = subscription.status as "active" | "inactive" | "cancelled";
+    user.subscription.status = subscription.status as
+      | "active"
+      | "inactive"
+      | "cancelled";
   }
 
   await user.save();
@@ -282,7 +299,9 @@ async function handleSubscriptionUpdated(subscription: Stripe.Subscription) {
 
 async function handleSubscriptionDeleted(subscription: Stripe.Subscription) {
   const customerId = subscription.customer as string;
-  const user = await User.findOne({ "subscription.stripeCustomerId": customerId });
+  const user = await User.findOne({
+    "subscription.stripeCustomerId": customerId,
+  });
 
   if (!user) {
     console.error(`User not found for customer: ${customerId}`);
@@ -302,7 +321,9 @@ async function handleSubscriptionDeleted(subscription: Stripe.Subscription) {
 
 async function handleInvoicePaymentSucceeded(invoice: Stripe.Invoice) {
   const customerId = invoice.customer as string;
-  const user = await User.findOne({ "subscription.stripeCustomerId": customerId });
+  const user = await User.findOne({
+    "subscription.stripeCustomerId": customerId,
+  });
 
   if (!user) {
     console.error(`User not found for customer: ${customerId}`);
@@ -322,7 +343,9 @@ async function handleInvoicePaymentSucceeded(invoice: Stripe.Invoice) {
 
 async function handleInvoicePaymentFailed(invoice: Stripe.Invoice) {
   const customerId = invoice.customer as string;
-  const user = await User.findOne({ "subscription.stripeCustomerId": customerId });
+  const user = await User.findOne({
+    "subscription.stripeCustomerId": customerId,
+  });
 
   if (!user) {
     console.error(`User not found for customer: ${customerId}`);
@@ -335,4 +358,3 @@ async function handleInvoicePaymentFailed(invoice: Stripe.Invoice) {
 }
 
 export default router;
-
