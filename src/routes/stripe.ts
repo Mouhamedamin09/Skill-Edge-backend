@@ -24,6 +24,20 @@ const STRIPE_PRICE_IDS = {
   "pro+": process.env.STRIPE_PRO_PLUS_PRICE_ID || "price_proplus_monthly",
 };
 
+// Validate Price IDs on startup
+if (process.env.STRIPE_SECRET_KEY) {
+  if (!process.env.STRIPE_PRO_PRICE_ID?.startsWith("price_")) {
+    console.warn(
+      `⚠️  STRIPE_PRO_PRICE_ID should start with "price_" (got: ${process.env.STRIPE_PRO_PRICE_ID})`
+    );
+  }
+  if (!process.env.STRIPE_PRO_PLUS_PRICE_ID?.startsWith("price_")) {
+    console.warn(
+      `⚠️  STRIPE_PRO_PLUS_PRICE_ID should start with "price_" (got: ${process.env.STRIPE_PRO_PLUS_PRICE_ID})`
+    );
+  }
+}
+
 // Middleware to check if Stripe is configured
 const requireStripe = (
   req: Request,
@@ -87,7 +101,19 @@ router.post(
       }
 
       const priceId = STRIPE_PRICE_IDS[planId as "pro" | "pro+"];
-      const clientUrl = process.env.CLIENT_URL || "https://skilledge-sz5fb.ondigitalocean.app";
+      const clientUrl =
+        process.env.CLIENT_URL || "https://skilledge-sz5fb.ondigitalocean.app";
+
+      // Validate Price ID
+      if (!priceId || !priceId.startsWith("price_")) {
+        console.error(`Invalid Price ID: ${priceId}. Must start with "price_"`);
+        res.status(500).json({
+          success: false,
+          error:
+            "Payment system misconfigured. Please contact support. (Invalid Price ID)",
+        });
+        return;
+      }
 
       console.log("Creating Stripe checkout session:", {
         planId,
