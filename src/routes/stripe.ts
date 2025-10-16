@@ -158,6 +158,117 @@ router.post(
 );
 
 /**
+ * Verify Checkout Session and Update Subscription
+ * POST /api/stripe/verify-session
+ */
+router.post(
+  "/verify-session",
+  authenticate,
+  requireStripe,
+  async (req: Request, res: Response): Promise<void> => {
+    try {
+      const userId = (req.user as any)?._id;
+      const { sessionId } = req.body;
+
+      if (!userId) {
+        res.status(401).json({ success: false, error: "Unauthorized" });
+        return;
+      }
+
+      if (!sessionId) {
+        res.status(400).json({ success: false, error: "Session ID required" });
+        return;
+      }
+
+      // Retrieve the session from Stripe
+      const session = await stripe!.checkout.sessions.retrieve(sessionId);
+
+      if (session.payment_status !== "paid") {
+        res.status(400).json({
+          success: false,
+          error: "Payment not completed",
+        });
+        return;
+      }
+
+      // Verify this session belongs to the requesting user
+      if (session.metadata?.userId !== userId.toString()) {
+        res.status(403).json({
+          success: false,
+          error: "Unauthorized access to session",
+        });
+        return;
+      }
+
+      // Update user subscription
+      const user = await User.findById(userId);
+      if (!user) {
+        res.status(404).json({ success: false, error: "User not found" });
+        return;
+      }
+
+      const planId = session.metadata?.planId;
+      if (!planId) {
+        res.status(400).json({
+          success: false,
+          error: "Invalid session metadata",
+        });
+        return;
+      }
+
+      // Update subscription
+      user.subscription.plan = planId as "pro" | "pro+";
+      user.subscription.status = "active";
+      user.subscription.startDate = new Date();
+      user.subscription.stripeSubscriptionId = session.subscription as string;
+
+      // Set minutes based on plan
+      if (planId === "pro") {
+        user.subscription.minutesLeft = 180; // 3 hours
+      } else if (planId === "pro+") {
+        user.subscription.minutesLeft = -1; // Unlimited
+      }
+
+      // Get subscription details for end date
+      if (session.subscription) {
+        try {
+          const subscription = await stripe!.subscriptions.retrieve(
+            session.subscription as string
+          );
+          if (subscription.current_period_end) {
+            user.subscription.endDate = new Date(
+              subscription.current_period_end * 1000
+            );
+          }
+        } catch (err) {
+          console.error("Error retrieving subscription:", err);
+        }
+      }
+
+      await user.save();
+      console.log(`✅ Subscription verified and activated for user ${userId}: ${planId}`);
+
+      res.json({
+        success: true,
+        subscription: {
+          plan: user.subscription.plan,
+          status: user.subscription.status,
+          minutesLeft: user.subscription.minutesLeft,
+          endDate: user.subscription.endDate,
+        },
+      });
+    } catch (error: any) {
+      console.error("Session verification error:", error);
+      res.status(500).json({
+        success: false,
+        error: "Failed to verify session",
+        details: error.message,
+      });
+    }
+  }
+);
+
+/**
  * Stripe Webhook Handler
  * POST /api/stripe/webhook
  */
