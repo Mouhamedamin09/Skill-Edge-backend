@@ -87,7 +87,14 @@ router.post(
       }
 
       const priceId = STRIPE_PRICE_IDS[planId as "pro" | "pro+"];
-      const clientUrl = process.env.CLIENT_URL || "http://localhost:3000";
+      const clientUrl = process.env.CLIENT_URL || "https://skilledge-sz5fb.ondigitalocean.app";
+
+      console.log("Creating Stripe checkout session:", {
+        planId,
+        priceId,
+        clientUrl,
+        customerId,
+      });
 
       // Create Checkout Session
       const session = await stripe!.checkout.sessions.create({
