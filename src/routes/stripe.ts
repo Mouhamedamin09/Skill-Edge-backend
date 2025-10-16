@@ -230,15 +230,14 @@ router.post(
       }
 
       // Get subscription details for end date
-      if (session.subscription) {
+      if (session.subscription && typeof session.subscription === 'string') {
         try {
           const subscription = await stripe!.subscriptions.retrieve(
-            session.subscription as string
+            session.subscription
           );
-          if (subscription.current_period_end) {
-            user.subscription.endDate = new Date(
-              subscription.current_period_end * 1000
-            );
+          // current_period_end exists on Subscription but TypeScript may not recognize it
+          if ('current_period_end' in subscription && subscription.current_period_end) {
+            user.subscription.endDate = new Date(subscription.current_period_end * 1000);
           }
         } catch (err) {
           console.error("Error retrieving subscription:", err);
@@ -246,7 +245,9 @@ router.post(
       }
 
       await user.save();
-      console.log(`✅ Subscription verified and activated for user ${userId}: ${planId}`);
+      console.log(
+        `✅ Subscription verified and activated for user ${userId}: ${planId}`
+      );
 
       res.json({
         success: true,
@@ -452,9 +453,8 @@ async function handleSubscriptionUpdated(subscription: Stripe.Subscription) {
     }
 
     // Update end date
-    const periodEnd = (subscription as any).current_period_end;
-    if (periodEnd) {
-      user.subscription.endDate = new Date(periodEnd * 1000);
+    if ('current_period_end' in subscription && subscription.current_period_end) {
+      user.subscription.endDate = new Date(subscription.current_period_end * 1000);
     }
   } else {
     user.subscription.status = subscription.status as
