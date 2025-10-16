@@ -5,15 +5,39 @@ import User from "../models/User";
 
 const router = express.Router();
 
-// Initialize Stripe with your secret key
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || "", {
-  apiVersion: "2025-09-30.clover",
-});
+// Initialize Stripe with your secret key (only if key is provided)
+let stripe: Stripe | null = null;
+
+if (process.env.STRIPE_SECRET_KEY) {
+  stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
+    apiVersion: "2025-09-30.clover",
+  });
+} else {
+  console.warn(
+    "⚠️  STRIPE_SECRET_KEY not configured. Stripe payment routes will return 503."
+  );
+}
 
 // Price IDs for each plan (you'll need to create these in Stripe Dashboard)
 const STRIPE_PRICE_IDS = {
   pro: process.env.STRIPE_PRO_PRICE_ID || "price_pro_monthly",
   "pro+": process.env.STRIPE_PRO_PLUS_PRICE_ID || "price_proplus_monthly",
+};
+
+// Middleware to check if Stripe is configured
+const requireStripe = (
+  req: Request,
+  res: Response,
+  next: express.NextFunction
+) => {
+  if (!stripe) {
+    res.status(503).json({
+      success: false,
+      error: "Payment system is not configured. Please contact support.",
+    });
+    return;
+  }
+  next();
 };
 
 /**
@@ -23,6 +47,7 @@ const STRIPE_PRICE_IDS = {
 router.post(
   "/create-checkout-session",
   authenticate,
+  requireStripe,
   async (req: Request, res: Response): Promise<void> => {
     try {
       const userId = (req.user as any)?._id;
@@ -49,7 +74,7 @@ router.post(
       // Get or create Stripe customer
       let customerId = user.subscription.stripeCustomerId;
       if (!customerId) {
-        const customer = await stripe.customers.create({
+        const customer = await stripe!.customers.create({
           email: user.email,
           name: `${user.firstName} ${user.lastName}`,
           metadata: {
@@ -65,7 +90,7 @@ router.post(
       const clientUrl = process.env.CLIENT_URL || "http://localhost:3000";
 
       // Create Checkout Session
-      const session = await stripe.checkout.sessions.create({
+      const session = await stripe!.checkout.sessions.create({
         customer: customerId,
         payment_method_types: ["card"],
         line_items: [
@@ -117,7 +142,7 @@ router.post(
     let event: Stripe.Event;
 
     try {
-      event = stripe.webhooks.constructEvent(
+      event = stripe!.webhooks.constructEvent(
         req.body,
         sig,
         process.env.STRIPE_WEBHOOK_SECRET || ""
@@ -178,6 +203,7 @@ router.post(
 router.post(
   "/create-portal-session",
   authenticate,
+  requireStripe,
   async (req: Request, res: Response): Promise<void> => {
     try {
       const userId = (req.user as any)?._id;
@@ -198,7 +224,7 @@ router.post(
 
       const clientUrl = process.env.CLIENT_URL || "http://localhost:3000";
 
-      const session = await stripe.billingPortal.sessions.create({
+      const session = await stripe!.billingPortal.sessions.create({
         customer: user.subscription.stripeCustomerId,
         return_url: `${clientUrl}/dashboard/billing`,
       });
