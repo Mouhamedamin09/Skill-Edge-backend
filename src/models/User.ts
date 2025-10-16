@@ -16,6 +16,9 @@ export interface IUser extends Document {
     endDate?: Date;
     tokens: number;
     minutesLeft: number;
+    stripeCustomerId?: string;
+    stripeSubscriptionId?: string;
+    stripePriceId?: string;
   };
   usage: {
     interviewsCompleted: number;
@@ -118,6 +121,18 @@ const UserSchema = new Schema<IUser>(
             ? -1
             : 0;
         },
+      },
+      stripeCustomerId: {
+        type: String,
+        default: null,
+      },
+      stripeSubscriptionId: {
+        type: String,
+        default: null,
+      },
+      stripePriceId: {
+        type: String,
+        default: null,
       },
     },
     usage: {

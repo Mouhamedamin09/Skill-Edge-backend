@@ -13,6 +13,7 @@
   "license": "ISC",
   "description": "",
   "dependencies": {
+    "@stripe/stripe-js": "^8.1.0",
     "axios": "^1.12.2",
     "bcryptjs": "^3.0.2",
     "cors": "^2.8.5",
@@ -27,7 +28,8 @@
     "multer": "^2.0.2",
     "nodemailer": "^6.9.8",
     "passport": "^0.7.0",
-    "passport-google-oauth20": "^2.0.0"
+    "passport-google-oauth20": "^2.0.0",
+    "stripe": "^19.1.0"
   },
   "devDependencies": {
     "@types/bcryptjs": "^2.4.6",

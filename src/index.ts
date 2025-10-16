@@ -21,12 +21,13 @@ import usageRoutes from "./routes/usage";
 // import googleAuthRoutes from "./routes/googleAuth";
 import testRoutes from "./routes/test";
 import aiRoutes from "./routes/ai";
+import stripeRoutes from "./routes/stripe";
 
 const app = express();
 const PORT = process.env.PORT || 5000;
 
 // Trust proxy - required for DigitalOcean/Heroku/etc
-app.set('trust proxy', 1);
+app.set("trust proxy", 1);
 
 // Security middleware
 app.use(helmet());
@@ -82,6 +83,9 @@ const limiter = rateLimit({
 });
 app.use("/api/", limiter);
 
+// Stripe webhook route MUST be before body parsing middleware (needs raw body)
+app.use("/api/stripe/webhook", stripeRoutes);
+
 // Body parsing middleware
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true }));
@@ -100,6 +104,7 @@ app.use("/api/subscription-codes", subscriptionCodeRoutes);
 app.use("/api/usage", usageRoutes);
 app.use("/api/test", testRoutes);
 app.use("/api/ai", aiRoutes);
+app.use("/api/stripe", stripeRoutes); // Stripe routes (except webhook which is already mounted)
 
 // Health check endpoint
 app.get("/api/health", (req, res) => {
