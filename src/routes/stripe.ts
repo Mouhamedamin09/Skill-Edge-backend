@@ -87,18 +87,20 @@ router.post(
 
       // Get or create Stripe customer
       let customerId = user.subscription.stripeCustomerId;
-      
+
       // Verify customer exists in current Stripe mode (test vs live)
       if (customerId) {
         try {
           await stripe!.customers.retrieve(customerId);
         } catch (error: any) {
           // Customer doesn't exist in this mode (e.g., test customer in live mode)
-          console.log(`Customer ${customerId} not found in current Stripe mode, creating new customer`);
+          console.log(
+            `Customer ${customerId} not found in current Stripe mode, creating new customer`
+          );
           customerId = ""; // Reset to create new customer
         }
       }
-      
+
       if (!customerId) {
         const customer = await stripe!.customers.create({
           email: user.email,
@@ -164,6 +166,101 @@ router.post(
       res.status(500).json({
         success: false,
         error: "Failed to create checkout session",
+        details: error.message,
+      });
+    }
+  }
+);
+
+/**
+ * Create Payment Link for Cash Payment (QR Code)
+ * POST /api/stripe/create-payment-link
+ */
+router.post(
+  "/create-payment-link",
+  authenticate,
+  requireStripe,
+  async (req: Request, res: Response): Promise<void> => {
+    try {
+      const userId = (req.user as any)?._id;
+      const { planId } = req.body;
+
+      if (!userId) {
+        res.status(401).json({ success: false, error: "Unauthorized" });
+        return;
+      }
+
+      if (!planId || !["pro", "pro+"].includes(planId)) {
+        res
+          .status(400)
+          .json({ success: false, error: "Invalid plan selected" });
+        return;
+      }
+
+      const user = await User.findById(userId);
+      if (!user) {
+        res.status(404).json({ success: false, error: "User not found" });
+        return;
+      }
+
+      const priceId = STRIPE_PRICE_IDS[planId as "pro" | "pro+"];
+
+      // Validate Price ID
+      if (!priceId || !priceId.startsWith("price_")) {
+        console.error(`Invalid Price ID: ${priceId}. Must start with "price_"`);
+        res.status(500).json({
+          success: false,
+          error:
+            "Payment system misconfigured. Please contact support. (Invalid Price ID)",
+        });
+        return;
+      }
+
+      console.log("Creating Stripe Payment Link for cash payment:", {
+        planId,
+        priceId,
+        userId: userId.toString(),
+        userEmail: user.email,
+      });
+
+      // Create a Payment Link
+      const paymentLink = await stripe!.paymentLinks.create({
+        line_items: [
+          {
+            price: priceId,
+            quantity: 1,
+          },
+        ],
+        after_completion: {
+          type: "redirect",
+          redirect: {
+            url: `${
+              process.env.CLIENT_URL ||
+              "https://skilledge-sz5fb.ondigitalocean.app"
+            }/dashboard/billing?success=true&payment_type=cash`,
+          },
+        },
+        metadata: {
+          userId: userId.toString(),
+          planId: planId,
+          paymentMethod: "cash",
+          userEmail: user.email,
+        },
+      });
+
+      console.log("Payment Link created successfully:", paymentLink.id);
+
+      res.json({
+        success: true,
+        paymentLinkId: paymentLink.id,
+        url: paymentLink.url,
+        qrCodeData: paymentLink.url, // Frontend can convert this to QR code
+      });
+    } catch (error: any) {
+      console.error("Stripe payment link error:", error);
+      res.status(500).json({
+        success: false,
+        error: "Failed to create payment link",
         details: error.message,
       });
     }
