@@ -411,10 +411,10 @@ router.post(
 /**
  * Stripe Webhook Handler
  * POST /api/stripe/webhook
+ * Note: express.raw() is applied in index.ts before this route
  */
 router.post(
   "/webhook",
-  express.raw({ type: "application/json" }),
   async (req: Request, res: Response): Promise<void> => {
     const sig = req.headers["stripe-signature"];
 

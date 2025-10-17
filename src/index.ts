@@ -83,9 +83,14 @@ const limiter = rateLimit({
 app.use("/api/", limiter);
 
 // Stripe webhook route MUST be before body parsing middleware (needs raw body)
-app.use("/api/stripe/webhook", stripeRoutes);
+// Mount webhook route with express.raw() middleware for signature verification
+app.use(
+  "/api/stripe/webhook",
+  express.raw({ type: "application/json" }),
+  stripeRoutes
+);
 
-// Body parsing middleware
+// Body parsing middleware (for all other routes)
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true }));
 
