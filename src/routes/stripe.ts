@@ -217,16 +217,30 @@ router.post(
       }
 
       // Update subscription
+      const wasAlreadyOnPlan = user.subscription.plan === planId && user.subscription.status === "active";
+      
       user.subscription.plan = planId as "pro" | "pro+";
       user.subscription.status = "active";
-      user.subscription.startDate = new Date();
+      
+      // Only update start date if it's a new subscription
+      if (!wasAlreadyOnPlan) {
+        user.subscription.startDate = new Date();
+      }
+      
       user.subscription.stripeSubscriptionId = session.subscription as string;
 
-      // Set minutes based on plan
+      // Add minutes based on plan (stack if already subscribed)
       if (planId === "pro") {
-        user.subscription.minutesLeft = 180; // 3 hours
+        if (wasAlreadyOnPlan && user.subscription.minutesLeft > 0) {
+          // Add 180 minutes to existing balance
+          user.subscription.minutesLeft += 180;
+          console.log(`➕ Added 180 minutes to existing Pro subscription. New balance: ${user.subscription.minutesLeft} minutes`);
+        } else {
+          // First time or expired subscription
+          user.subscription.minutesLeft = 180;
+        }
       } else if (planId === "pro+") {
-        user.subscription.minutesLeft = -1; // Unlimited
+        user.subscription.minutesLeft = -1; // Unlimited (can't stack)
       }
 
       // Get subscription details for end date
@@ -410,17 +424,31 @@ async function handleCheckoutSessionCompleted(
   }
 
   // Update user subscription
+  const wasAlreadyOnPlan = user.subscription.plan === planId && user.subscription.status === "active";
+  
   user.subscription.plan = planId as "pro" | "pro+";
   user.subscription.status = "active";
-  user.subscription.startDate = new Date();
+  
+  // Only update start date if it's a new subscription
+  if (!wasAlreadyOnPlan) {
+    user.subscription.startDate = new Date();
+  }
+  
   user.subscription.stripeSubscriptionId = session.subscription as string;
 
-  // Set minutes based on plan
+  // Add minutes based on plan (stack if already subscribed)
   if (planId === "pro") {
-    user.subscription.minutesLeft = 180; // 3 hours
+    if (wasAlreadyOnPlan && user.subscription.minutesLeft > 0) {
+      // Add 180 minutes to existing balance
+      user.subscription.minutesLeft += 180;
+      console.log(`➕ Added 180 minutes to existing Pro subscription. New balance: ${user.subscription.minutesLeft} minutes`);
+    } else {
+      // First time or expired subscription
+      user.subscription.minutesLeft = 180;
+    }
     user.subscription.endDate = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000); // 30 days
   } else if (planId === "pro+") {
-    user.subscription.minutesLeft = -1; // Unlimited
+    user.subscription.minutesLeft = -1; // Unlimited (can't stack)
     user.subscription.endDate = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000); // 30 days
   }
 
@@ -502,9 +530,18 @@ async function handleInvoicePaymentSucceeded(invoice: Stripe.Invoice) {
     return;
   }
 
-  // Renew minutes for pro plan on successful payment
+  // Add minutes for pro plan on successful payment (monthly renewal or additional purchase)
   if (user.subscription.plan === "pro") {
-    user.subscription.minutesLeft = 180; // Refresh to 3 hours
+    if (invoice.billing_reason === "subscription_cycle") {
+      // Monthly renewal - add 180 minutes to existing balance
+      if (user.subscription.minutesLeft > 0) {
+        user.subscription.minutesLeft += 180;
+        console.log(`➕ Monthly renewal: Added 180 minutes. New balance: ${user.subscription.minutesLeft} minutes`);
+      } else {
+        // First renewal or expired
+        user.subscription.minutesLeft = 180;
+      }
+    }
   }
   // Pro+ already has unlimited
   user.subscription.status = "active";
