@@ -87,6 +87,18 @@ router.post(
 
       // Get or create Stripe customer
       let customerId = user.subscription.stripeCustomerId;
+      
+      // Verify customer exists in current Stripe mode (test vs live)
+      if (customerId) {
+        try {
+          await stripe!.customers.retrieve(customerId);
+        } catch (error: any) {
+          // Customer doesn't exist in this mode (e.g., test customer in live mode)
+          console.log(`Customer ${customerId} not found in current Stripe mode, creating new customer`);
+          customerId = ""; // Reset to create new customer
+        }
+      }
+      
       if (!customerId) {
         const customer = await stripe!.customers.create({
           email: user.email,
@@ -98,6 +110,7 @@ router.post(
         customerId = customer.id;
         user.subscription.stripeCustomerId = customerId;
         await user.save();
+        console.log(`Created new Stripe customer: ${customerId}`);
       }
 
       const priceId = STRIPE_PRICE_IDS[planId as "pro" | "pro+"];
@@ -264,10 +277,12 @@ router.post(
           console.error("Error retrieving subscription:", err);
         }
       }
-      
+
       // Fallback: Set 30 days from now if we couldn't get it from Stripe
       if (!endDateSet) {
-        user.subscription.endDate = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+        user.subscription.endDate = new Date(
+          Date.now() + 30 * 24 * 60 * 60 * 1000
+        );
         console.log("⏰ Set default 30-day billing period");
       }
 
