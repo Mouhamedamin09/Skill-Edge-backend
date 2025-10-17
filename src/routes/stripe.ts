@@ -237,7 +237,7 @@ router.post(
           );
           // current_period_end exists on Subscription but TypeScript may not recognize it
           const periodEnd = (subscription as any).current_period_end;
-          if (periodEnd && typeof periodEnd === 'number') {
+          if (periodEnd && typeof periodEnd === "number") {
             user.subscription.endDate = new Date(periodEnd * 1000);
           }
         } catch (err) {
@@ -455,7 +455,7 @@ async function handleSubscriptionUpdated(subscription: Stripe.Subscription) {
 
     // Update end date
     const periodEnd = (subscription as any).current_period_end;
-    if (periodEnd && typeof periodEnd === 'number') {
+    if (periodEnd && typeof periodEnd === "number") {
       user.subscription.endDate = new Date(periodEnd * 1000);
     }
   } else {

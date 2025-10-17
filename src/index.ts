@@ -16,7 +16,6 @@ import connectDB from "./config/database";
 // Import routes
 import authRoutes from "./routes/auth";
 import verificationRoutes from "./routes/verification";
-import subscriptionCodeRoutes from "./routes/subscriptionCodes";
 import usageRoutes from "./routes/usage";
 // import googleAuthRoutes from "./routes/googleAuth";
 import testRoutes from "./routes/test";
@@ -100,7 +99,6 @@ app.use(morgan("combined"));
 app.use("/api/auth", authRoutes);
 // app.use("/api/auth", googleAuthRoutes);
 app.use("/api/verification", verificationRoutes);
-app.use("/api/subscription-codes", subscriptionCodeRoutes);
 app.use("/api/usage", usageRoutes);
 app.use("/api/test", testRoutes);
 app.use("/api/ai", aiRoutes);
