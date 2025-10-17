@@ -248,6 +248,7 @@ router.post(
       }
 
       // Get subscription details for end date
+      let endDateSet = false;
       if (session.subscription && typeof session.subscription === "string") {
         try {
           const subscription = await stripe!.subscriptions.retrieve(
@@ -257,10 +258,17 @@ router.post(
           const periodEnd = (subscription as any).current_period_end;
           if (periodEnd && typeof periodEnd === "number") {
             user.subscription.endDate = new Date(periodEnd * 1000);
+            endDateSet = true;
           }
         } catch (err) {
           console.error("Error retrieving subscription:", err);
         }
+      }
+      
+      // Fallback: Set 30 days from now if we couldn't get it from Stripe
+      if (!endDateSet) {
+        user.subscription.endDate = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+        console.log("⏰ Set default 30-day billing period");
       }
 
       await user.save();
