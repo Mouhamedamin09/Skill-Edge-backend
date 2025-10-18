@@ -10,7 +10,7 @@ export interface IUser extends Document {
   isEmailVerified: boolean;
   avatar?: string;
   subscription: {
-    plan: "free" | "pro" | "pro+" | "enterprise";
+    plan: "free" | "pro" | "pro+" | "enterprise" | "test";
     status: "active" | "inactive" | "cancelled";
     startDate: Date;
     endDate?: Date;
@@ -84,7 +84,7 @@ const UserSchema = new Schema<IUser>(
     subscription: {
       plan: {
         type: String,
-        enum: ["free", "pro", "pro+", "enterprise"],
+        enum: ["free", "pro", "pro+", "enterprise", "test"],
         default: "free",
       },
       status: {
