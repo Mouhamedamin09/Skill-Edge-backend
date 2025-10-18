@@ -389,14 +389,14 @@ router.post(
       // Add minutes based on plan (stack if already subscribed)
       if (planId === "pro") {
         if (wasAlreadyOnPlan && user.subscription.minutesLeft > 0) {
-          // Add 180 minutes to existing balance
-          user.subscription.minutesLeft += 180;
+          // Add 90 minutes to existing balance
+          user.subscription.minutesLeft += 90;
           console.log(
-            `➕ Added 180 minutes to existing Pro subscription. New balance: ${user.subscription.minutesLeft} minutes`
+            `➕ Added 90 minutes to existing Pro subscription. New balance: ${user.subscription.minutesLeft} minutes`
           );
         } else {
           // First time or expired subscription
-          user.subscription.minutesLeft = 180;
+          user.subscription.minutesLeft = 90;
         }
       } else if (planId === "pro+") {
         user.subscription.minutesLeft = -1; // Unlimited (can't stack)
@@ -671,14 +671,14 @@ async function handleCheckoutSessionCompleted(
   // Add minutes based on plan (stack if already subscribed)
   if (planId === "pro") {
     if (wasAlreadyOnPlan && user.subscription.minutesLeft > 0) {
-      // Add 180 minutes to existing balance
-      user.subscription.minutesLeft += 180;
+      // Add 90 minutes to existing balance
+      user.subscription.minutesLeft += 90;
       console.log(
         `➕ Added 180 minutes to existing Pro subscription. New balance: ${user.subscription.minutesLeft} minutes`
       );
     } else {
       // First time or expired subscription
-      user.subscription.minutesLeft = 180;
+      user.subscription.minutesLeft = 90;
     }
     user.subscription.endDate = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000); // 30 days
   } else if (planId === "pro+") {
@@ -711,7 +711,7 @@ async function handleSubscriptionUpdated(subscription: Stripe.Subscription) {
     const priceId = subscription.items.data[0]?.price.id;
     if (priceId === STRIPE_PRICE_IDS.pro) {
       user.subscription.plan = "pro";
-      user.subscription.minutesLeft = 180;
+      user.subscription.minutesLeft = 90;
     } else if (priceId === STRIPE_PRICE_IDS["pro+"]) {
       user.subscription.plan = "pro+";
       user.subscription.minutesLeft = -1;
@@ -769,15 +769,15 @@ async function handleInvoicePaymentSucceeded(invoice: Stripe.Invoice) {
   // Add minutes for pro plan on successful payment (monthly renewal or additional purchase)
   if (user.subscription.plan === "pro") {
     if (invoice.billing_reason === "subscription_cycle") {
-      // Monthly renewal - add 180 minutes to existing balance
+      // Monthly renewal - add 90 minutes to existing balance
       if (user.subscription.minutesLeft > 0) {
-        user.subscription.minutesLeft += 180;
+        user.subscription.minutesLeft += 90;
         console.log(
-          `➕ Monthly renewal: Added 180 minutes. New balance: ${user.subscription.minutesLeft} minutes`
+          `➕ Monthly renewal: Added 90 minutes. New balance: ${user.subscription.minutesLeft} minutes`
         );
       } else {
         // First renewal or expired
-        user.subscription.minutesLeft = 180;
+        user.subscription.minutesLeft = 90;
       }
     }
   }

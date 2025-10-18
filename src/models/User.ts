@@ -84,7 +84,7 @@ const UserSchema = new Schema<IUser>(
     subscription: {
       plan: {
         type: String,
-        enum: ["free", "pro", "pro+", "enterprise", "test"],
+        enum: ["free", "pro", "pro+", "enterprise"],
         default: "free",
       },
       status: {
@@ -112,11 +112,11 @@ const UserSchema = new Schema<IUser>(
       minutesLeft: {
         type: Number,
         default: function () {
-          // Minutes allocations: free=15, pro=180, pro+=unlimited (-1)
+          // Minutes allocations: free=5, pro=90, pro+=unlimited (-1)
           return (this as any).subscription?.plan === "free"
-            ? 15
+            ? 5
             : (this as any).subscription?.plan === "pro"
-            ? 180
+            ? 90
             : (this as any).subscription?.plan === "pro+"
             ? -1
             : 0;
