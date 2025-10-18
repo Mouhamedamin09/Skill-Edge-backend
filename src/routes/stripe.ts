@@ -231,7 +231,9 @@ router.post(
         customerId = customer.id;
         user.subscription.stripeCustomerId = customerId;
         await user.save();
-        console.log(`✅ Created new Stripe customer for cash payment: ${customerId}`);
+        console.log(
+          `✅ Created new Stripe customer for cash payment: ${customerId}`
+        );
       }
 
       const priceId = STRIPE_PRICE_IDS[planId as "pro" | "pro+"];
@@ -597,7 +599,7 @@ async function handleCheckoutSessionCompleted(
       "subscription.stripeCustomerId": session.customer as string,
     });
     if (user) {
-      userId = user._id.toString();
+      userId = (user._id as any).toString();
       console.log(`✅ Found user by Stripe customer ID: ${session.customer}`);
     }
   }
@@ -606,7 +608,7 @@ async function handleCheckoutSessionCompleted(
   if (!user && session.customer_email) {
     user = await User.findOne({ email: session.customer_email });
     if (user) {
-      userId = user._id.toString();
+      userId = (user._id as any).toString();
       console.log(`✅ Found user by email: ${session.customer_email}`);
     }
   }
@@ -683,7 +685,9 @@ async function handleCheckoutSessionCompleted(
   }
 
   await user.save();
-  console.log(`✅✅✅ Subscription activated for user ${userId}: ${planId} (${user.subscription.minutesLeft} minutes)`);
+  console.log(
+    `✅✅✅ Subscription activated for user ${userId}: ${planId} (${user.subscription.minutesLeft} minutes)`
+  );
 }
 
 async function handleSubscriptionUpdated(subscription: Stripe.Subscription) {
