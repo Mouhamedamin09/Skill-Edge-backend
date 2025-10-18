@@ -257,7 +257,9 @@ router.post(
         customerId,
       });
 
-      // Create a Payment Link with customer prefill
+      // Create a Payment Link
+      // NOTE: Cannot use customer_creation with recurring prices (subscriptions)
+      // Instead, we rely on customer email matching for webhook
       const paymentLink = await stripe!.paymentLinks.create({
         line_items: [
           {
@@ -274,19 +276,17 @@ router.post(
             }/dashboard/billing?success=true&payment_type=cash`,
           },
         },
-        // CRITICAL: Set customer_creation to 'always' but link to existing customer via metadata
-        customer_creation: "always",
         metadata: {
           userId: userId.toString(),
           planId: planId,
           paymentMethod: "cash",
           userEmail: user.email,
-          existingCustomerId: customerId, // Store for reference
+          stripeCustomerId: customerId, // Store for webhook to use
         },
-        // Prefill customer email to help link the payment
+        // Prefill customer email to help match in webhook
         custom_text: {
           submit: {
-            message: `Upgrading to ${planId.toUpperCase()} plan`,
+            message: `Upgrading to ${planId.toUpperCase()} plan for ${user.email}`,
           },
         },
       });
