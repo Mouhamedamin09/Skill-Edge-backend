@@ -227,4 +227,48 @@ router.put(
   }
 );
 
+// Update user usage (minutes consumed)
+router.post("/update-usage", authenticate, async (req: AuthRequest, res: Response) => {
+  try {
+    const { minutesUsed } = req.body;
+    
+    if (!minutesUsed || minutesUsed < 0) {
+      return res.status(400).json({ message: "Invalid minutes used" });
+    }
+
+    const user = await User.findById(req.userId);
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    // Update total minutes used
+    user.usage.totalMinutesUsed = (user.usage.totalMinutesUsed || 0) + minutesUsed;
+    
+    // Update minutes left (subtract from remaining)
+    if (user.subscription.minutesLeft > 0) {
+      user.subscription.minutesLeft = Math.max(0, user.subscription.minutesLeft - minutesUsed);
+    }
+    
+    await user.save();
+
+    return res.json({
+      message: "Usage updated successfully",
+      user: {
+        id: user._id,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        email: user.email,
+        subscription: user.subscription,
+        usage: user.usage,
+      }
+    });
+  } catch (error: any) {
+    console.error("Update usage error:", error);
+    return res.status(500).json({
+      message: "Server error",
+      error: process.env.NODE_ENV === "development" ? error.message : undefined,
+    });
+  }
+});
+
 export default router;
