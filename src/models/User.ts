@@ -10,7 +10,7 @@ export interface IUser extends Document {
   isEmailVerified: boolean;
   avatar?: string;
   subscription: {
-    plan: "free" | "pro" | "pro+" | "enterprise" | "test";
+    plan: "free" | "pro" | "pro+" | "enterprise";
     status: "active" | "inactive" | "cancelled";
     startDate: Date;
     endDate?: Date;
