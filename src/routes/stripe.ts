@@ -22,6 +22,7 @@ if (process.env.STRIPE_SECRET_KEY) {
 const STRIPE_PRICE_IDS = {
   pro: process.env.STRIPE_PRO_PRICE_ID || "price_pro_monthly",
   "pro+": process.env.STRIPE_PRO_PLUS_PRICE_ID || "price_proplus_monthly",
+  test: process.env.STRIPE_TEST_PRICE_ID || "price_test", // LOCAL TESTING ONLY
 };
 
 // Validate Price IDs on startup
@@ -72,7 +73,7 @@ router.post(
         return;
       }
 
-      if (!planId || !["pro", "pro+"].includes(planId)) {
+      if (!planId || !["pro", "pro+", "test"].includes(planId)) {
         res
           .status(400)
           .json({ success: false, error: "Invalid plan selected" });
@@ -191,7 +192,7 @@ router.post(
         return;
       }
 
-      if (!planId || !["pro", "pro+"].includes(planId)) {
+      if (!planId || !["pro", "pro+", "test"].includes(planId)) {
         res
           .status(400)
           .json({ success: false, error: "Invalid plan selected" });
@@ -286,7 +287,9 @@ router.post(
         // Prefill customer email to help match in webhook
         custom_text: {
           submit: {
-            message: `Upgrading to ${planId.toUpperCase()} plan for ${user.email}`,
+            message: `Upgrading to ${planId.toUpperCase()} plan for ${
+              user.email
+            }`,
           },
         },
       });
@@ -635,6 +638,8 @@ async function handleCheckoutSessionCompleted(
         planId = "pro";
       } else if (priceId === STRIPE_PRICE_IDS["pro+"]) {
         planId = "pro+";
+      } else if (priceId === STRIPE_PRICE_IDS.test) {
+        planId = "test";
       }
       console.log(`📋 Determined plan from line items: ${planId}`);
     } catch (err) {
@@ -682,6 +687,17 @@ async function handleCheckoutSessionCompleted(
   } else if (planId === "pro+") {
     user.subscription.minutesLeft = -1; // Unlimited (can't stack)
     user.subscription.endDate = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000); // 30 days
+  } else if (planId === "test") {
+    // TEST PLAN: Give 10 minutes for testing
+    if (wasAlreadyOnPlan && user.subscription.minutesLeft > 0) {
+      user.subscription.minutesLeft += 10;
+      console.log(
+        `➕ Added 10 TEST minutes to existing subscription. New balance: ${user.subscription.minutesLeft} minutes`
+      );
+    } else {
+      user.subscription.minutesLeft = 10;
+    }
+    user.subscription.endDate = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days
   }
 
   await user.save();
@@ -713,6 +729,9 @@ async function handleSubscriptionUpdated(subscription: Stripe.Subscription) {
     } else if (priceId === STRIPE_PRICE_IDS["pro+"]) {
       user.subscription.plan = "pro+";
       user.subscription.minutesLeft = -1;
+    } else if (priceId === STRIPE_PRICE_IDS.test) {
+      user.subscription.plan = "test" as any;
+      user.subscription.minutesLeft = 10;
     }
 
     // Update end date
