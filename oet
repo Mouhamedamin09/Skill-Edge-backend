@@ -1,0 +1,82 @@
+[1mdiff --git a/src/routes/stripe.ts b/src/routes/stripe.ts[m
+[1mindex 40f0d96..73b8b8f 100644[m
+[1m--- a/src/routes/stripe.ts[m
+[1m+++ b/src/routes/stripe.ts[m
+[36m@@ -217,16 +217,18 @@[m [mrouter.post([m
+       }[m
+ [m
+       // Update subscription[m
+[31m-      const wasAlreadyOnPlan = user.subscription.plan === planId && user.subscription.status === "active";[m
+[31m-      [m
+[32m+[m[32m      const wasAlreadyOnPlan =[m
+[32m+[m[32m        user.subscription.plan === planId &&[m
+[32m+[m[32m        user.subscription.status === "active";[m
+[32m+[m
+       user.subscription.plan = planId as "pro" | "pro+";[m
+       user.subscription.status = "active";[m
+[31m-      [m
+[32m+[m
+       // Only update start date if it's a new subscription[m
+       if (!wasAlreadyOnPlan) {[m
+         user.subscription.startDate = new Date();[m
+       }[m
+[31m-      [m
+[32m+[m
+       user.subscription.stripeSubscriptionId = session.subscription as string;[m
+ [m
+       // Add minutes based on plan (stack if already subscribed)[m
+[36m@@ -234,7 +236,9 @@[m [mrouter.post([m
+         if (wasAlreadyOnPlan && user.subscription.minutesLeft > 0) {[m
+           // Add 180 minutes to existing balance[m
+           user.subscription.minutesLeft += 180;[m
+[31m-          console.log(`➕ Added 180 minutes to existing Pro subscription. New balance: ${user.subscription.minutesLeft} minutes`);[m
+[32m+[m[32m          console.log([m
+[32m+[m[32m            `➕ Added 180 minutes to existing Pro subscription. New balance: ${user.subscription.minutesLeft} minutes`[m
+[32m+[m[32m          );[m
+         } else {[m
+           // First time or expired subscription[m
+           user.subscription.minutesLeft = 180;[m
+[36m@@ -424,16 +428,17 @@[m [masync function handleCheckoutSessionCompleted([m
+   }[m
+ [m
+   // Update user subscription[m
+[31m-  const wasAlreadyOnPlan = user.subscription.plan === planId && user.subscription.status === "active";[m
+[31m-  [m
+[32m+[m[32m  const wasAlreadyOnPlan =[m
+[32m+[m[32m    user.subscription.plan === planId && user.subscription.status === "active";[m
+[32m+[m
+   user.subscription.plan = planId as "pro" | "pro+";[m
+   user.subscription.status = "active";[m
+[31m-  [m
+[32m+[m
+   // Only update start date if it's a new subscription[m
+   if (!wasAlreadyOnPlan) {[m
+     user.subscription.startDate = new Date();[m
+   }[m
+[31m-  [m
+[32m+[m
+   user.subscription.stripeSubscriptionId = session.subscription as string;[m
+ [m
+   // Add minutes based on plan (stack if already subscribed)[m
+[36m@@ -441,7 +446,9 @@[m [masync function handleCheckoutSessionCompleted([m
+     if (wasAlreadyOnPlan && user.subscription.minutesLeft > 0) {[m
+       // Add 180 minutes to existing balance[m
+       user.subscription.minutesLeft += 180;[m
+[31m-      console.log(`➕ Added 180 minutes to existing Pro subscription. New balance: ${user.subscription.minutesLeft} minutes`);[m
+[32m+[m[32m      console.log([m
+[32m+[m[32m        `➕ Added 180 minutes to existing Pro subscription. New balance: ${user.subscription.minutesLeft} minutes`[m
+[32m+[m[32m      );[m
+     } else {[m
+       // First time or expired subscription[m
+       user.subscription.minutesLeft = 180;[m
+[36m@@ -536,7 +543,9 @@[m [masync function handleInvoicePaymentSucceeded(invoice: Stripe.Invoice) {[m
+       // Monthly renewal - add 180 minutes to existing balance[m
+       if (user.subscription.minutesLeft > 0) {[m
+         user.subscription.minutesLeft += 180;[m
+[31m-        console.log(`➕ Monthly renewal: Added 180 minutes. New balance: ${user.subscription.minutesLeft} minutes`);[m
+[32m+[m[32m        console.log([m
+[32m+[m[32m          `➕ Monthly renewal: Added 180 minutes. New balance: ${user.subscription.minutesLeft} minutes`[m
+[32m+[m[32m        );[m
+       } else {[m
+         // First renewal or expired[m
+         user.subscription.minutesLeft = 180;[m

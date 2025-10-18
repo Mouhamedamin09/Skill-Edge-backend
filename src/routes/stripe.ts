@@ -175,6 +175,7 @@ router.post(
 /**
  * Create Payment Link for Cash Payment (QR Code)
  * POST /api/stripe/create-payment-link
+ * CRITICAL: Must create/link Stripe Customer for webhook to work!
  */
 router.post(
   "/create-payment-link",
@@ -203,6 +204,36 @@ router.post(
         return;
       }
 
+      // CRITICAL: Get or create Stripe customer (needed for webhook to identify user!)
+      let customerId = user.subscription.stripeCustomerId;
+
+      // Verify customer exists in current Stripe mode
+      if (customerId) {
+        try {
+          await stripe!.customers.retrieve(customerId);
+        } catch (error: any) {
+          console.log(
+            `Customer ${customerId} not found in current Stripe mode, creating new customer`
+          );
+          customerId = ""; // Reset to create new customer
+        }
+      }
+
+      if (!customerId) {
+        const customer = await stripe!.customers.create({
+          email: user.email,
+          name: `${user.firstName} ${user.lastName}`,
+          metadata: {
+            userId: userId.toString(),
+            source: "cash_payment",
+          },
+        });
+        customerId = customer.id;
+        user.subscription.stripeCustomerId = customerId;
+        await user.save();
+        console.log(`✅ Created new Stripe customer for cash payment: ${customerId}`);
+      }
+
       const priceId = STRIPE_PRICE_IDS[planId as "pro" | "pro+"];
 
       // Validate Price ID
@@ -221,9 +252,10 @@ router.post(
         priceId,
         userId: userId.toString(),
         userEmail: user.email,
+        customerId,
       });
 
-      // Create a Payment Link
+      // Create a Payment Link with customer prefill
       const paymentLink = await stripe!.paymentLinks.create({
         line_items: [
           {
@@ -240,15 +272,24 @@ router.post(
             }/dashboard/billing?success=true&payment_type=cash`,
           },
         },
+        // CRITICAL: Set customer_creation to 'always' but link to existing customer via metadata
+        customer_creation: "always",
         metadata: {
           userId: userId.toString(),
           planId: planId,
           paymentMethod: "cash",
           userEmail: user.email,
+          existingCustomerId: customerId, // Store for reference
+        },
+        // Prefill customer email to help link the payment
+        custom_text: {
+          submit: {
+            message: `Upgrading to ${planId.toUpperCase()} plan`,
+          },
         },
       });
 
-      console.log("Payment Link created successfully:", paymentLink.id);
+      console.log("✅ Payment Link created successfully:", paymentLink.id);
 
       res.json({
         success: true,
@@ -257,7 +298,7 @@ router.post(
         qrCodeData: paymentLink.url, // Frontend can convert this to QR code
       });
     } catch (error: any) {
-      console.error("Stripe payment link error:", error);
+      console.error("❌ Stripe payment link error:", error);
       res.status(500).json({
         success: false,
         error: "Failed to create payment link",
@@ -413,72 +454,69 @@ router.post(
  * POST /api/stripe/webhook
  * Note: express.raw() is applied in index.ts before this route
  */
-router.post(
-  "/webhook",
-  async (req: Request, res: Response): Promise<void> => {
-    const sig = req.headers["stripe-signature"];
+router.post("/webhook", async (req: Request, res: Response): Promise<void> => {
+  const sig = req.headers["stripe-signature"];
 
-    if (!sig) {
-      res.status(400).send("No signature");
-      return;
-    }
-
-    let event: Stripe.Event;
-
-    try {
-      event = stripe!.webhooks.constructEvent(
-        req.body,
-        sig,
-        process.env.STRIPE_WEBHOOK_SECRET || ""
-      );
-    } catch (err: any) {
-      console.error("Webhook signature verification failed:", err.message);
-      res.status(400).send(`Webhook Error: ${err.message}`);
-      return;
-    }
-
-    // Handle the event
-    try {
-      switch (event.type) {
-        case "checkout.session.completed":
-          await handleCheckoutSessionCompleted(
-            event.data.object as Stripe.Checkout.Session
-          );
-          break;
-
-        case "customer.subscription.updated":
-          await handleSubscriptionUpdated(
-            event.data.object as Stripe.Subscription
-          );
-          break;
-
-        case "customer.subscription.deleted":
-          await handleSubscriptionDeleted(
-            event.data.object as Stripe.Subscription
-          );
-          break;
-
-        case "invoice.payment_succeeded":
-          await handleInvoicePaymentSucceeded(
-            event.data.object as Stripe.Invoice
-          );
-          break;
-
-        case "invoice.payment_failed":
-          await handleInvoicePaymentFailed(event.data.object as Stripe.Invoice);
-          break;
-
-        default:
-          console.log(`Unhandled event type: ${event.type}`);
-      }
-
-      res.json({ received: true });
-    } catch (error: any) {
-      console.error("Webhook handler error:", error);
-      res.status(500).json({ error: "Webhook handler failed" });
-    }
+  if (!sig) {
+    res.status(400).send("No signature");
+    return;
   }
-);
+
+  let event: Stripe.Event;
+
+  try {
+    event = stripe!.webhooks.constructEvent(
+      req.body,
+      sig,
+      process.env.STRIPE_WEBHOOK_SECRET || ""
+    );
+  } catch (err: any) {
+    console.error("Webhook signature verification failed:", err.message);
+    res.status(400).send(`Webhook Error: ${err.message}`);
+    return;
+  }
+
+  // Handle the event
+  try {
+    switch (event.type) {
+      case "checkout.session.completed":
+        await handleCheckoutSessionCompleted(
+          event.data.object as Stripe.Checkout.Session
+        );
+        break;
+
+      case "customer.subscription.updated":
+        await handleSubscriptionUpdated(
+          event.data.object as Stripe.Subscription
+        );
+        break;
+
+      case "customer.subscription.deleted":
+        await handleSubscriptionDeleted(
+          event.data.object as Stripe.Subscription
+        );
+        break;
+
+      case "invoice.payment_succeeded":
+        await handleInvoicePaymentSucceeded(
+          event.data.object as Stripe.Invoice
+        );
+        break;
+
+      case "invoice.payment_failed":
+        await handleInvoicePaymentFailed(event.data.object as Stripe.Invoice);
+        break;
+
+      default:
+        console.log(`Unhandled event type: ${event.type}`);
+    }
+
+    res.json({ received: true });
+  } catch (error: any) {
+    console.error("Webhook handler error:", error);
+    res.status(500).json({ error: "Webhook handler failed" });
+  }
+});
 
 /**
  * Create Customer Portal Session
@@ -533,17 +571,77 @@ router.post(
 async function handleCheckoutSessionCompleted(
   session: Stripe.Checkout.Session
 ) {
-  const userId = session.metadata?.userId;
-  const planId = session.metadata?.planId;
+  console.log("🔔 Webhook: checkout.session.completed", {
+    sessionId: session.id,
+    paymentStatus: session.payment_status,
+    customerEmail: session.customer_email,
+    customerId: session.customer,
+    metadata: session.metadata,
+  });
 
-  if (!userId || !planId) {
-    console.error("Missing userId or planId in session metadata");
+  let userId = session.metadata?.userId;
+  let planId = session.metadata?.planId;
+  let user = null;
+
+  // Try to find user by metadata first (regular checkout)
+  if (userId) {
+    user = await User.findById(userId);
+    if (user) {
+      console.log(`✅ Found user by metadata userId: ${userId}`);
+    }
+  }
+
+  // FALLBACK: If no metadata (Payment Link case), find user by customer ID or email
+  if (!user && session.customer) {
+    user = await User.findOne({
+      "subscription.stripeCustomerId": session.customer as string,
+    });
+    if (user) {
+      userId = user._id.toString();
+      console.log(`✅ Found user by Stripe customer ID: ${session.customer}`);
+    }
+  }
+
+  // LAST RESORT: Find by email
+  if (!user && session.customer_email) {
+    user = await User.findOne({ email: session.customer_email });
+    if (user) {
+      userId = user._id.toString();
+      console.log(`✅ Found user by email: ${session.customer_email}`);
+    }
+  }
+
+  if (!user || !userId) {
+    console.error("❌ Could not find user for checkout session:", {
+      sessionId: session.id,
+      customerEmail: session.customer_email,
+      customerId: session.customer,
+      metadataUserId: session.metadata?.userId,
+    });
     return;
   }
 
-  const user = await User.findById(userId);
-  if (!user) {
-    console.error(`User not found: ${userId}`);
+  // Determine plan from metadata or from line items
+  if (!planId) {
+    // Try to get plan from price ID in line items
+    try {
+      const lineItems = await stripe!.checkout.sessions.listLineItems(
+        session.id
+      );
+      const priceId = lineItems.data[0]?.price?.id;
+      if (priceId === STRIPE_PRICE_IDS.pro) {
+        planId = "pro";
+      } else if (priceId === STRIPE_PRICE_IDS["pro+"]) {
+        planId = "pro+";
+      }
+      console.log(`📋 Determined plan from line items: ${planId}`);
+    } catch (err) {
+      console.error("Error fetching line items:", err);
+    }
+  }
+
+  if (!planId) {
+    console.error("❌ Could not determine plan ID from session");
     return;
   }
 
@@ -557,6 +655,11 @@ async function handleCheckoutSessionCompleted(
   // Only update start date if it's a new subscription
   if (!wasAlreadyOnPlan) {
     user.subscription.startDate = new Date();
+  }
+
+  // Save Stripe customer ID if not already saved
+  if (session.customer && !user.subscription.stripeCustomerId) {
+    user.subscription.stripeCustomerId = session.customer as string;
   }
 
   user.subscription.stripeSubscriptionId = session.subscription as string;
@@ -580,7 +683,7 @@ async function handleCheckoutSessionCompleted(
   }
 
   await user.save();
-  console.log(`Subscription activated for user ${userId}: ${planId}`);
+  console.log(`✅✅✅ Subscription activated for user ${userId}: ${planId} (${user.subscription.minutesLeft} minutes)`);
 }
 
 async function handleSubscriptionUpdated(subscription: Stripe.Subscription) {
